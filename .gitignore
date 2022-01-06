@@ -9,3 +9,4 @@ enableops.motd
 terraform-Role.yaml
 terraform_*.json
 argocd_root_application.yaml
+envfile
