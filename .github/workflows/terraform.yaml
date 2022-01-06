@@ -1,0 +1,65 @@
+name: terraform
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+env:
+  TERRAFORM_VERSION:                 "1.1.2"
+  GOOGLE_PROJECT:                    "${{secrets.TF_VAR_google_project_id}}"
+  GOOGLE_APPLICATION_CREDENTIALS:    "google.json"
+  TF_VAR_GOOGLE_CREDENTIALS:         "google.json"
+  TF_VAR_ORG_NAME:                   "${{secrets.TF_VAR_ORG_NAME}}"
+  TF_VAR_google_project_id:          "${{secrets.TF_VAR_google_project_id}}"
+  TF_VAR_google_gloud_zone:          "${{secrets.TF_VAR_google_gloud_zone}}"
+  TF_VAR_argocd_password:            "${{secrets.TF_VAR_argocd_password}}"
+jobs:
+  terraform:
+    name: terraform
+    runs-on: ubuntu-latest
+    steps:
+      - name: 'Checkout'
+        uses: actions/checkout@master
+      - name: get terraform
+        run: |
+          curl -L -s https://releases.hashicorp.com/terraform/"$TERRAFORM_VERSION"/terraform_"$TERRAFORM_VERSION"_linux_amd64.zip -o terraform.zip
+          unzip -d bin terraform.zip
+      - name: add workspace/bin to path
+        run: echo "$GITHUB_WORKSPACE/bin" >> $GITHUB_PATH
+      - name: save google creds json
+        run:  echo '${{secrets.GOOGLE_CREDENTIALS}}' | dd of=google.json
+      - name: init
+        run: terraform init
+        env:
+          TF_VAR_GITHUB_TOKEN: ${{secrets.TF_VAR_GITHUB_TOKEN}}
+      - name: validate
+        run:  terraform validate
+      - name: check fmt
+        run:  terraform fmt -check
+      - name: plan
+        id: plan
+        run: |
+          echo ::set-output name=plan_has_changes::false
+          if terraform plan -detailed-exitcode; then
+             echo "No changes detected"
+          else
+             export planExitCode=$?
+             if [ ${planExitCode} -eq 2 ]; then
+                echo ::set-output name=plan_has_changes::true
+                echo "Plan succeeded and there are some changes"
+                exit 0
+             fi
+          fi
+          exit ${planExitCode}
+        env:
+          TF_VAR_GITHUB_TOKEN: ${{secrets.TF_VAR_GITHUB_TOKEN}}
+      - name: apply -refresh-only
+        if: ${{github.ref == 'refs/heads/main' && steps.plan.outputs.plan_has_changes == 'false'}}
+        run: terraform apply -refresh-only -auto-approve
+        env:
+          TF_VAR_GITHUB_TOKEN: ${{secrets.TF_VAR_GITHUB_TOKEN}}
+      - name: apply
+        if: ${{github.ref == 'refs/heads/main' && steps.plan.outputs.plan_has_changes == 'true'}}
+        run: terraform apply -auto-approve
+        env:
+          TF_VAR_GITHUB_TOKEN: ${{secrets.TF_VAR_GITHUB_TOKEN}}
