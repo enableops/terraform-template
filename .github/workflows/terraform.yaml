@@ -21,24 +21,39 @@ jobs:
       - name: 'Checkout'
         uses: actions/checkout@master
       - name: check that configuration exists
-        run: if ls *.zz &>/dev/null; then echo "Configuration present"; else echo "No configuration for terraform yet"; exit 0; fi
+        id: configuration
+        run: |
+          echo ::set-output name=present::false
+          if ls *.zz &>/dev/null; then
+            echo "Configuration present"
+            echo ::set-output name=present::true
+          else
+            echo "No configuration for terraform yet"
+          fi
       - name: get terraform
+        if: ${{steps.configuration.outputs.present == 'true'}}
         run: |
           curl -L -s https://releases.hashicorp.com/terraform/"$TERRAFORM_VERSION"/terraform_"$TERRAFORM_VERSION"_linux_amd64.zip -o terraform.zip
           unzip -d bin terraform.zip
       - name: add workspace/bin to path
+        if: ${{steps.configuration.outputs.present == 'true'}}
         run: echo "$GITHUB_WORKSPACE/bin" >> $GITHUB_PATH
       - name: save google creds json
+        if: ${{steps.configuration.outputs.present == 'true'}}
         run:  echo '${{secrets.GOOGLE_CREDENTIALS}}' | dd of=google.json
       - name: init
+        if: ${{steps.configuration.outputs.present == 'true'}}
         run: terraform init
         env:
           TF_VAR_GITHUB_TOKEN: ${{secrets.TF_VAR_GITHUB_TOKEN}}
       - name: validate
+        if: ${{steps.configuration.outputs.present == 'true'}}
         run:  terraform validate
       - name: check fmt
+        if: ${{steps.configuration.outputs.present == 'true'}}
         run:  terraform fmt -check
       - name: plan
+        if: ${{steps.configuration.outputs.present == 'true'}}
         id: plan
         run: |
           echo ::set-output name=plan_has_changes::false
@@ -56,12 +71,12 @@ jobs:
         env:
           TF_VAR_GITHUB_TOKEN: ${{secrets.TF_VAR_GITHUB_TOKEN}}
       - name: apply -refresh-only
-        if: ${{github.ref == 'refs/heads/main' && steps.plan.outputs.plan_has_changes == 'false'}}
+        if: ${{github.ref == 'refs/heads/main' && steps.plan.outputs.plan_has_changes == 'false' && steps.configuration.outputs.present == 'true'}}
         run: terraform apply -refresh-only -auto-approve
         env:
           TF_VAR_GITHUB_TOKEN: ${{secrets.TF_VAR_GITHUB_TOKEN}}
       - name: apply
-        if: ${{github.ref == 'refs/heads/main' && steps.plan.outputs.plan_has_changes == 'true'}}
+        if: ${{github.ref == 'refs/heads/main' && steps.plan.outputs.plan_has_changes == 'true' && steps.configuration.outputs.present == 'true'}}
         run: terraform apply -auto-approve
         env:
           TF_VAR_GITHUB_TOKEN: ${{secrets.TF_VAR_GITHUB_TOKEN}}
