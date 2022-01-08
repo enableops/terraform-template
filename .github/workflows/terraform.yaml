@@ -20,6 +20,8 @@ jobs:
     steps:
       - name: 'Checkout'
         uses: actions/checkout@master
+      - name: check that configuration exists
+        run: if ls *.zz &>/dev/null; then echo "Configuration present"; else echo "No configuration for terraform yet"; exit 0; fi
       - name: get terraform
         run: |
           curl -L -s https://releases.hashicorp.com/terraform/"$TERRAFORM_VERSION"/terraform_"$TERRAFORM_VERSION"_linux_amd64.zip -o terraform.zip
