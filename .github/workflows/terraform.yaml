@@ -24,7 +24,7 @@ jobs:
         id: configuration
         run: |
           echo ::set-output name=present::false
-          if ls *.zz &>/dev/null; then
+          if ls *.tf &>/dev/null; then
             echo "Configuration present"
             echo ::set-output name=present::true
           else
